@@ -581,7 +581,7 @@
             </div>
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h4>📜 Lịch Sử Đơn Hàng</h4><input type="text" id="searchOrderReport" class="form-control" style="width:150px;" placeholder="Tìm Mã ĐH..." oninput="searchOrderTable()"></div>
-                <div style="max-height: 400px; overflow-y:auto;"><table id="rptOrdersTable"><thead><tr><th>Khách hàng</th><th>Mã</th><th>Ngày</th><th>Ghi chú nội bộ</th><th>Doanh thu</th><th>Lãi thực</th><th>Thao tác</th></tr></thead><tbody></tbody></table></div>
+                <div style="max-height: 400px; overflow-y:auto;"><table id="rptOrdersTable"><thead><tr><th>Khách hàng</th><th>Mã</th><th>Ngày</th><th>Ghi chú nội bộ</th><th class="text-right">Doanh thu</th><th class="text-right">Vốn</th><th class="text-right">Chi phí</th><th class="text-right">Lãi thực</th><th class="text-center">Thao tác</th></tr></thead><tbody></tbody></table></div>
             </div>
         </div>
         <div class="card">
@@ -2615,7 +2615,25 @@
         document.getElementById('chartTopCustomers').innerHTML = `<div class="chart-container">${sortedCust.map(item => `<div class="chart-column"><div class="chart-value">${formatCurrency(item[1], true)}</div><div class="chart-bar" style="height: ${Math.max(5, (item[1]/maxCustVal)*80)}%; background: var(--success-color);"></div><div class="chart-label">${item[0]}</div></div>`).join('')}</div>`; 
     };
 
-    const renderOrderReportTable = (orders) => { document.querySelector('#rptOrdersTable tbody').innerHTML = orders.map(o => `<tr><td>${o.customer.name}<br><small>${o.customer.phone}</small></td><td><span style="color:blue; cursor:pointer;" onclick="startEditOrder('${o.id}')">${o.id}</span></td><td>${new Date(o.date).toLocaleDateString('vi-VN')}</td><td style="color:#dc3545;font-style:italic">${o.internalNote || ''}</td><td class="text-right">${formatCurrency(o.totalAmount)}</td><td class="text-right" style="font-weight:bold; color:green;">${formatCurrency(o.totalAmount - (o.cost||0))}</td><td><button class="btn btn-primary btn-sm" onclick="startEditOrder('${o.id}')">✏️ Sửa</button><button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')">X</button></td></tr>`).join(''); };
+    const renderOrderReportTable = (orders) => { 
+        const cashflow = loadData(KEYS.CASHFLOW);
+        document.querySelector('#rptOrdersTable tbody').innerHTML = orders.map(o => {
+            const orderExp = cashflow.filter(c => c.type === 'CHI' && c.orderId === o.id).reduce((sum, c) => sum + (c.amount||0), 0);
+            const cogs = o.cost || 0;
+            const netProfit = (o.totalAmount || 0) - cogs - orderExp;
+            return `<tr>
+                <td>${o.customer.name}<br><small>${o.customer.phone}</small></td>
+                <td><span style="color:blue; cursor:pointer;" onclick="startEditOrder('${o.id}')">${o.id}</span></td>
+                <td>${new Date(o.date).toLocaleDateString('vi-VN')}</td>
+                <td style="color:#dc3545;font-style:italic">${o.internalNote || ''}</td>
+                <td class="text-right" style="font-weight:bold;">${formatCurrency(o.totalAmount)}</td>
+                <td class="text-right" style="color:#6c757d;">${formatCurrency(cogs)}</td>
+                <td class="text-right" style="color:var(--danger-color);">${formatCurrency(orderExp)}</td>
+                <td class="text-right" style="font-weight:bold; color:${netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'};">${formatCurrency(netProfit)}</td>
+                <td class="text-center"><button class="btn btn-primary btn-sm" onclick="startEditOrder('${o.id}')">✏️ Sửa</button><button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')">X</button></td>
+            </tr>`;
+        }).join(''); 
+    };
     const renderExpenseDetails = (orders, cashflow) => { const orderExps = cashflow.filter(c => c.type === 'CHI' && c.orderId && c.orderId.trim() !== ''); document.querySelector('#rptOrderExpTable tbody').innerHTML = orderExps.map(c => `<tr><td>${c.date}</td><td>${c.orderId}</td><td>${formatCurrency(c.amount)}</td><td>${c.category} - ${c.note}</td></tr>`).join(''); const opExps = cashflow.filter(c => c.type === 'CHI' && (!c.orderId || c.orderId.trim() === '')); document.querySelector('#rptGenExpTable tbody').innerHTML = opExps.map(c => `<tr><td>${c.date}</td><td>${c.category}</td><td>${formatCurrency(c.amount)}</td></tr>`).join(''); };
     const searchOrderTable = () => { const term = document.getElementById('searchOrderReport').value.toLowerCase(); const orders = loadData(KEYS.ORDERS).filter(o => o.id.toLowerCase().includes(term)); renderOrderReportTable(orders); };
     const toggleCustomFilter = () => { document.getElementById('customFilterArea').classList.toggle('active'); };
