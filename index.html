@@ -193,6 +193,13 @@
                          <div><label style="font-size:12px;">Phí Ship/Khác (+/-)</label><input type="text" id="shippingCost" class="form-control" value="0" oninput="formatInput(this); updateInvoicePreview()"></div>
                          <div><label style="font-size:12px;">Ghi chú (In phiếu)</label><input type="text" id="orderNote" class="form-control" placeholder="..." oninput="updateInvoicePreview()"></div>
                     </div>
+                    
+                    <!-- CHI PHÍ NỘI BỘ (MỚI THÊM) -->
+                    <div style="margin-top: 10px;">
+                        <label style="font-size:12px; color: var(--warning-color); font-weight: bold;">💰 Chi phí phát sinh/Ship (Nội bộ - Không in):</label>
+                        <input type="text" id="internalExpense" class="form-control" style="border: 1px dashed var(--warning-color); background: #fffdf5;" placeholder="0" value="0" oninput="formatInput(this)">
+                    </div>
+
                     <div style="margin-top: 10px;">
                         <label style="font-size:12px; color: var(--danger-color); font-weight: bold;">📝 Ghi chú nội bộ (Sales):</label>
                         <input type="text" id="internalNote" class="form-control" style="border: 1px dashed var(--danger-color); background: #fff5f5;" placeholder="Thông tin này chỉ hiển thị nội bộ...">
@@ -996,7 +1003,9 @@
         const totalSpent = totalOrderAmount + totalThu; 
         
         // LỢI NHUẬN = DOANH THU - GIÁ VỐN - PHIẾU CHI
-        const totalProfit = totalSpent - totalCogs - totalChi; 
+        // Lưu ý: Cập nhật thêm việc trừ đi các chi phí nội bộ của đơn hàng
+        const totalOrderInternalExps = orders.reduce((sum, o) => sum + (o.internalExpense || 0), 0);
+        const totalProfit = totalSpent - totalCogs - totalChi - totalOrderInternalExps; 
 
         // Tính toán Nợ / Trả thừa (Dựa trên tổng tiền đơn hàng và tổng tiền khách đã trả)
         const totalDebt = totalOrderAmount - totalPaidAmount;
@@ -1258,6 +1267,7 @@
         if(items.length === 0) { alert("Chưa có sản phẩm!"); return; }
         
         const ship = parseInput(document.getElementById('shippingCost').value);
+        const internalExpense = parseInput(document.getElementById('internalExpense').value) || 0;
         const order = { 
             id: document.getElementById('invID').textContent, 
             date: document.getElementById('orderDate').value ? new Date(document.getElementById('orderDate').value).toISOString() : new Date().toISOString(), 
@@ -1266,6 +1276,7 @@
             items: items, shipping: ship, 
             note: document.getElementById('orderNote').value, 
             internalNote: document.getElementById('internalNote').value, 
+            internalExpense: internalExpense,
             totalAmount: totalRev + ship, cost: totalCost,
             payments: [] // Khởi tạo mảng thanh toán rỗng cho đơn mới
         };
@@ -1330,8 +1341,8 @@
     };
 
     const createOrderItemRow = (p='', q=1, pr=0) => { const tbody = document.getElementById('orderItemsBody'); const row = tbody.insertRow(); row.innerHTML = `<td><input type="text" class="form-control item-name" list="productListSales" value="${p}" placeholder="Gõ tên..." onchange="updateInvoicePreview()"></td><td><input type="number" class="form-control item-qty" value="${q}" oninput="updateInvoicePreview()"></td><td><input type="text" class="form-control item-price" value="${pr > 0 ? formatCurrency(pr).replace(/\D/g,'') : ''}" placeholder="0" oninput="formatInput(this); updateInvoicePreview()"></td><td><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); updateInvoicePreview()">x</button></td>`; };
-    const startEditOrder = (id) => { const o = loadData(KEYS.ORDERS).find(x=>x.id===id); if(!o) return; switchTab('tab-sales'); editingOrderId = id; document.getElementById('editModeBanner').style.display='block'; document.getElementById('editingOrderIDText').textContent = id; document.getElementById('btnSaveOrder').textContent = "💾 CẬP NHẬT"; document.getElementById('btnSaveOrder').classList.replace('btn-primary','btn-warning'); document.getElementById('btnCancelEdit').style.display = 'inline-block'; document.getElementById('custPhone').value = o.customer.phone; document.getElementById('custName').value = o.customer.name; document.getElementById('custAddress').value = o.customer.address; document.getElementById('shippingCost').value = formatCurrency(o.shipping).replace(/\D/g,''); document.getElementById('orderNote').value = o.note || ''; document.getElementById('internalNote').value = o.internalNote || ''; document.getElementById('saleStaffSelect').value = o.staff; document.getElementById('orderItemsBody').innerHTML=''; o.items.forEach(i=>createOrderItemRow(i.fullName || i.name, i.quantity, i.price)); if(o.date) document.getElementById('orderDate').value = new Date(o.date).toISOString().slice(0,10); updateInvoicePreview(); }
-    const cancelEditOrder = () => { editingOrderId = null; document.getElementById('editModeBanner').style.display='none'; document.getElementById('btnSaveOrder').textContent = "✅ LƯU ĐƠN"; document.getElementById('btnSaveOrder').classList.replace('btn-warning','btn-primary'); document.getElementById('btnCancelEdit').style.display='none'; document.getElementById('custPhone').value=''; document.getElementById('custName').value=''; document.getElementById('custAddress').value=''; document.getElementById('shippingCost').value=0; document.getElementById('orderNote').value=''; document.getElementById('internalNote').value=''; document.getElementById('orderItemsBody').innerHTML=''; createOrderItemRow(); document.getElementById('orderDate').value = new Date().toISOString().slice(0,10); updateInvoicePreview(); }
+    const startEditOrder = (id) => { const o = loadData(KEYS.ORDERS).find(x=>x.id===id); if(!o) return; switchTab('tab-sales'); editingOrderId = id; document.getElementById('editModeBanner').style.display='block'; document.getElementById('editingOrderIDText').textContent = id; document.getElementById('btnSaveOrder').textContent = "💾 CẬP NHẬT"; document.getElementById('btnSaveOrder').classList.replace('btn-primary','btn-warning'); document.getElementById('btnCancelEdit').style.display = 'inline-block'; document.getElementById('custPhone').value = o.customer.phone; document.getElementById('custName').value = o.customer.name; document.getElementById('custAddress').value = o.customer.address; document.getElementById('shippingCost').value = formatCurrency(o.shipping).replace(/\D/g,''); document.getElementById('orderNote').value = o.note || ''; document.getElementById('internalNote').value = o.internalNote || ''; document.getElementById('internalExpense').value = o.internalExpense ? formatCurrency(o.internalExpense).replace(/\D/g,'') : '0'; document.getElementById('saleStaffSelect').value = o.staff; document.getElementById('orderItemsBody').innerHTML=''; o.items.forEach(i=>createOrderItemRow(i.fullName || i.name, i.quantity, i.price)); if(o.date) document.getElementById('orderDate').value = new Date(o.date).toISOString().slice(0,10); updateInvoicePreview(); }
+    const cancelEditOrder = () => { editingOrderId = null; document.getElementById('editModeBanner').style.display='none'; document.getElementById('btnSaveOrder').textContent = "✅ LƯU ĐƠN"; document.getElementById('btnSaveOrder').classList.replace('btn-warning','btn-primary'); document.getElementById('btnCancelEdit').style.display='none'; document.getElementById('custPhone').value=''; document.getElementById('custName').value=''; document.getElementById('custAddress').value=''; document.getElementById('shippingCost').value=0; document.getElementById('orderNote').value=''; document.getElementById('internalNote').value=''; document.getElementById('internalExpense').value='0'; document.getElementById('orderItemsBody').innerHTML=''; createOrderItemRow(); document.getElementById('orderDate').value = new Date().toISOString().slice(0,10); updateInvoicePreview(); }
 
     const reRenderCurrentStaff = () => {
         if(currentViewedStaff) viewStaffDetail(currentViewedStaff);
@@ -2574,11 +2585,18 @@
         
         const rev = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0); 
         const cogs = orders.reduce((sum, o) => sum + (o.cost || 0), 0); 
-        const orderCosts = cashflow.filter(c => c.type === 'CHI' && c.orderId && c.orderId.trim() !== '').reduce((sum, c) => sum + (c.amount||0), 0);
+        
+        // Chi phí gắn cứng trong đơn hàng
+        const internalOrderCosts = orders.reduce((sum, o) => sum + (o.internalExpense || 0), 0);
+        // Chi phí phiếu chi có gắn mã đơn (dữ liệu cũ/ngoại lệ)
+        const legacyOrderCosts = cashflow.filter(c => c.type === 'CHI' && c.orderId && c.orderId.trim() !== '').reduce((sum, c) => sum + (c.amount||0), 0);
+        
+        const orderCosts = internalOrderCosts + legacyOrderCosts;
+        
         const opExp = cashflow.filter(c => c.type === 'CHI' && (!c.orderId || c.orderId.trim() === '')).reduce((sum, c) => sum + (c.amount||0), 0);
         
-        // Tính tổng tất cả phiếu chi cho KPI card
-        const totalAllExpenses = cashflow.filter(c => c.type === 'CHI').reduce((sum, c) => sum + (c.amount||0), 0);
+        // Tính tổng tất cả phiếu chi (và chi phí nội bộ đơn) cho KPI card TỔNG CHI (Vận hành)
+        const totalAllExpenses = internalOrderCosts + cashflow.filter(c => c.type === 'CHI').reduce((sum, c) => sum + (c.amount||0), 0);
         
         const otherInc = cashflow.filter(c => c.type === 'THU').reduce((sum, c) => sum + (c.amount||0), 0);
         const totalImport = stock.reduce((sum, s) => sum + (s.quantityIn * s.costPrice), 0);
@@ -2618,7 +2636,7 @@
     const renderOrderReportTable = (orders) => { 
         const cashflow = loadData(KEYS.CASHFLOW);
         document.querySelector('#rptOrdersTable tbody').innerHTML = orders.map(o => {
-            const orderExp = cashflow.filter(c => c.type === 'CHI' && c.orderId === o.id).reduce((sum, c) => sum + (c.amount||0), 0);
+            const orderExp = (o.internalExpense || 0) + cashflow.filter(c => c.type === 'CHI' && c.orderId === o.id).reduce((sum, c) => sum + (c.amount||0), 0);
             const cogs = o.cost || 0;
             const netProfit = (o.totalAmount || 0) - cogs - orderExp;
             return `<tr>
