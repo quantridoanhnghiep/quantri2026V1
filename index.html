@@ -1990,10 +1990,38 @@
         if(field === 'costPrice') newValue = parseInput(value);
         
         stock[index][field] = newValue;
+
+        // Cập nhật history của stock
+        if (field === 'costPrice') {
+            if (stock[index].history) {
+                stock[index].history.forEach(h => h.price = newValue);
+            }
+        } else if (field === 'quantityIn') {
+            let diff = newValue - oldValue;
+            if (stock[index].history && stock[index].history.length > 0) {
+                let lastHistory = stock[index].history[stock[index].history.length - 1];
+                lastHistory.qty += diff;
+                if (lastHistory.qty < 0) lastHistory.qty = 0;
+            }
+        }
+
         saveData(KEYS.STOCK, stock);
 
         // 1. Nếu sửa TÊN SP -> Đồng bộ tên đơn cũ
         if (field === 'name' && normalizeStr(oldValue) !== normalizeStr(newValue)) {
+            // Đồng bộ Unbilled Imports, Import Logs, Supplier Debts
+            let unbilled = loadData(KEYS.UNBILLED_IMPORTS);
+            unbilled.forEach(u => { if(normalizeStr(u.name) === normalizeStr(oldValue)) u.name = newValue; });
+            saveData(KEYS.UNBILLED_IMPORTS, unbilled);
+
+            let logs = loadData(KEYS.IMPORT_LOGS);
+            logs.forEach(l => { l.items.forEach(i => { if(normalizeStr(i.name) === normalizeStr(oldValue)) i.name = newValue; }); });
+            saveData(KEYS.IMPORT_LOGS, logs);
+
+            let debts = loadData(KEYS.SUPPLIER_DEBTS);
+            debts.forEach(d => { if(d.items) d.items.forEach(i => { if(normalizeStr(i.name) === normalizeStr(oldValue)) i.name = newValue; }); });
+            saveData(KEYS.SUPPLIER_DEBTS, debts);
+
             if(confirm(`Bạn vừa đổi tên từ "${oldValue}" sang "${newValue}".\nCập nhật tên mới cho TẤT CẢ đơn hàng lịch sử?`)) {
                 let orders = loadData(KEYS.ORDERS);
                 let count = 0;
@@ -2014,6 +2042,31 @@
 
         // 2. Nếu sửa GIÁ VỐN -> Hỏi có muốn cập nhật lại lợi nhuận cũ không
         if (field === 'costPrice' && oldValue !== newValue) {
+            // Đồng bộ UNBILLED_IMPORTS
+            let unbilled = loadData(KEYS.UNBILLED_IMPORTS);
+            unbilled.forEach(u => {
+                if(normalizeStr(u.name) === normalizeStr(stock[index].name)) {
+                    u.price = newValue;
+                    u.total = u.qty * newValue;
+                }
+            });
+            saveData(KEYS.UNBILLED_IMPORTS, unbilled);
+
+            // Đồng bộ IMPORT_LOGS
+            let logs = loadData(KEYS.IMPORT_LOGS);
+            logs.forEach(l => {
+                let changed = false;
+                l.items.forEach(it => {
+                    if(normalizeStr(it.name) === normalizeStr(stock[index].name)) {
+                        it.price = newValue;
+                        it.total = it.qty * newValue;
+                        changed = true;
+                    }
+                });
+                if(changed) l.totalAmount = l.items.reduce((s, x) => s + x.total, 0);
+            });
+            saveData(KEYS.IMPORT_LOGS, logs);
+
             if(confirm(`Bạn vừa thay đổi Giá Vốn từ ${formatCurrency(oldValue)} thành ${formatCurrency(newValue)}.\nBạn có muốn cập nhật giá vốn này cho TẤT CẢ đơn hàng lịch sử để tính lại lợi nhuận không?`)) {
                 let orders = loadData(KEYS.ORDERS);
                 let count = 0;
@@ -2046,8 +2099,43 @@
             }
         }
 
+        // 3. Nếu sửa SỐ LƯỢNG NHẬP -> Đồng bộ UNBILLED_IMPORTS và IMPORT_LOGS
+        if (field === 'quantityIn' && oldValue !== newValue) {
+            let diff = newValue - oldValue;
+            const productName = stock[index].name;
+
+            // Đồng bộ UNBILLED_IMPORTS (tìm dòng gần nhất)
+            let unbilled = loadData(KEYS.UNBILLED_IMPORTS);
+            let targetUnbilled = unbilled.slice().reverse().find(u => normalizeStr(u.name) === normalizeStr(productName));
+            if (targetUnbilled) {
+                let actual = unbilled.find(u => u.id === targetUnbilled.id);
+                actual.qty += diff;
+                if (actual.qty < 0) actual.qty = 0;
+                actual.total = actual.qty * actual.price;
+                saveData(KEYS.UNBILLED_IMPORTS, unbilled);
+            }
+
+            // Đồng bộ IMPORT_LOGS (tìm dòng gần nhất)
+            let logs = loadData(KEYS.IMPORT_LOGS);
+            for(let i = logs.length - 1; i >= 0; i--) {
+                let it = logs[i].items.find(x => normalizeStr(x.name) === normalizeStr(productName));
+                if(it) {
+                    it.qty += diff;
+                    if(it.qty < 0) it.qty = 0;
+                    it.total = it.qty * it.price;
+                    logs[i].totalAmount = logs[i].items.reduce((s, x) => s + x.total, 0);
+                    saveData(KEYS.IMPORT_LOGS, logs);
+                    break;
+                }
+            }
+        }
+
         renderInventory();
         updateProductDatalist('productListStock');
+        
+        if(document.getElementById('tab-supplier-debt').classList.contains('active')) {
+            resetSdImportRows();
+        }
     };
     
     // ==========================================
