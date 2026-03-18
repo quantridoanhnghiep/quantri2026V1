@@ -103,8 +103,8 @@
         .company-name { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px;}
         .company-address { font-size: 12px; font-style: italic; margin-bottom: 10px; }
         
-        .inv-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 16px; margin-bottom: 2px; } /* Thu nhỏ title */
-        .inv-sub-title { text-align: center; font-style: italic; margin-bottom: 10px; font-size: 13px; } /* Thu hẹp margin */
+        .inv-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 16px; margin-bottom: 2px; } 
+        .inv-sub-title { text-align: center; font-style: italic; margin-bottom: 10px; font-size: 13px; } 
         
         .inv-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         .inv-table th { background-color: #4472c4; color: white; text-align: center; border: 1px solid #ccc; padding: 5px; -webkit-print-color-adjust: exact; }
@@ -294,10 +294,29 @@
     </div>
 
     <div id="tab-customers" class="tab-pane">
-        <div class="card" style="height: 100%; overflow: hidden;">
-            <div class="crm-layout">
-                <div class="crm-sidebar">
-                    
+        <!-- NEW GLOBAL DASHBOARD -->
+        <div class="dashboard-grid" style="margin-bottom: 15px;">
+            <div class="kpi-card expense">
+                <h3>TỔNG PHẢI THU (Tiền Đơn)</h3>
+                <div class="value" id="kpiCustGlobalPayable">0 ₫</div>
+            </div>
+            <div class="kpi-card success">
+                <h3>TỔNG ĐÃ THU</h3>
+                <div class="value" id="kpiCustGlobalPaid">0 ₫</div>
+            </div>
+            <div class="kpi-card cost clickable" onclick="showCustGlobalBreakdown('debt')" style="cursor: pointer;" title="Bấm để xem chi tiết khách đang nợ">
+                <h3 style="display:flex; justify-content:space-between; align-items:center;">TỔNG CÒN NỢ <span style="font-size:10px; color:#888; text-transform:none;">(Bấm xem chi tiết)</span></h3>
+                <div class="value" id="kpiCustGlobalDebt" style="color: var(--danger-color);">0 ₫</div>
+            </div>
+            <div class="kpi-card revenue clickable" onclick="showCustGlobalBreakdown('overpaid')" style="cursor: pointer;" title="Bấm để xem chi tiết khách trả thừa">
+                <h3 style="display:flex; justify-content:space-between; align-items:center;">TỔNG TRẢ THỪA <span style="font-size:10px; color:#888; text-transform:none;">(Bấm xem chi tiết)</span></h3>
+                <div class="value" id="kpiCustGlobalOverpaid" style="color: var(--primary-color);">0 ₫</div>
+            </div>
+        </div>
+
+        <div class="card" style="height: calc(100vh - 250px); overflow: hidden; padding: 0;">
+            <div class="crm-layout" style="height: 100%;">
+                <div class="crm-sidebar" style="padding: 15px; border-right: 1px solid #eee;">
                     <!-- BỘ LỌC DOANH THU KHÁCH HÀNG -->
                     <div style="margin-bottom: 15px; background: #eef7ff; padding: 10px; border-radius: 4px; border: 1px solid #b8daff;">
                         <h4 style="margin: 0 0 10px 0; color: #004085; font-size: 14px;">📅 Lọc Doanh Thu</h4>
@@ -319,7 +338,7 @@
                     </div>
                     <div id="crmCustomerList"></div>
                 </div>
-                <div class="crm-detail" id="crmDetailView">
+                <div class="crm-detail" id="crmDetailView" style="padding: 15px; display: flex; flex-direction: column;">
                     <div style="text-align: center; color: #888; margin-top: 100px;">
                         <span style="font-size: 50px;">👥</span>
                         <h3>Chọn một khách hàng từ danh sách bên trái</h3>
@@ -629,6 +648,14 @@
     </div>
 </div>
 
+<!-- Modal Chi Tiết Nợ/Thừa Của TẤT CẢ KHÁCH HÀNG -->
+<div id="custDebtBreakdownModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 600px; max-width: 95%;">
+        <span class="close" onclick="document.getElementById('custDebtBreakdownModal').style.display='none'" style="font-size: 30px;">&times;</span>
+        <div id="custDebtBreakdownContent"></div>
+    </div>
+</div>
+
 <!-- Modal Lịch Sử Nhập Kho Của 1 Sản Phẩm / Lịch sử nhập của NCC -->
 <div id="stockHistoryModal" class="modal" style="display:none;">
     <div class="modal-content" style="width: 800px; max-width: 95%;">
@@ -652,6 +679,7 @@
     const GOOGLE_SCRIPT_URL = 'THAY_LINK_WEB_APP_CUA_BAN_VAO_DAY'; 
 
     let currentSupplierBalances = {}; // Biến toàn cục để theo dõi số nợ/thừa thuần của từng NCC
+    let globalCustomerBalances = {}; // Biến toàn cục để theo dõi công nợ của tất cả Khách hàng
 
     // --- SAFE DATA LOADING ---
     const loadData = (key) => { 
@@ -791,7 +819,7 @@
                 updateInvoicePreview(); 
             }
             if(tabId === 'tab-cashflow') { populateCashflowSelects(); renderCashflow(); updateOrderDatalist(); }
-            if(tabId === 'tab-customers') renderCrmSidebar();
+            if(tabId === 'tab-customers') { renderCrmSidebar(); renderCustGlobalDashboard(); }
             if(tabId === 'tab-staff') renderStaffSidebar();
             if(tabId === 'tab-inventory') { renderSupplierSidebar(); populateSupplierSelect(); renderInventory(); updateProductDatalist('productListStock'); if(document.querySelectorAll('#stockEntryBody tr').length === 0) createStockRow(); }
             if(tabId === 'tab-supplier-debt') { populateDebtSupplierSelect(); resetSdImportRows(); renderSupplierDebtTab(); }
@@ -891,6 +919,90 @@
             updateProductDatalist('productListStock');
             alert(`Đồng bộ ${count} dòng!`); btn.textContent = "☁️ Đồng bộ từ Sheet"; btn.disabled = false;
         } catch (error) { alert('Lỗi kết nối!'); event.target.textContent = "☁️ Đồng bộ từ Sheet"; event.target.disabled = false; }
+    };
+
+    // ==========================================
+    // TÍNH TOÁN DASHBOARD KHÁCH HÀNG (TỔNG)
+    // ==========================================
+    const renderCustGlobalDashboard = () => {
+        let orders = loadData(KEYS.ORDERS);
+
+        let totPayable = 0;
+        let totPaid = 0;
+        globalCustomerBalances = {};
+
+        // Group by customer phone
+        orders.forEach(o => {
+            let phone = o.customer.phone;
+            if (!globalCustomerBalances[phone]) {
+                globalCustomerBalances[phone] = { name: o.customer.name, phone: phone, payable: 0, paid: 0 };
+            }
+            
+            let oAmount = o.totalAmount || 0;
+            let oPaid = o.payments ? o.payments.reduce((s, p) => s + parseFloat(p.amount||0), 0) : 0;
+            
+            globalCustomerBalances[phone].payable += oAmount;
+            globalCustomerBalances[phone].paid += oPaid;
+            
+            totPayable += oAmount;
+            totPaid += oPaid;
+        });
+
+        let totDebt = 0;
+        let totOverpaid = 0;
+
+        for (let phone in globalCustomerBalances) {
+            let bal = globalCustomerBalances[phone].payable - globalCustomerBalances[phone].paid;
+            globalCustomerBalances[phone].balance = bal;
+            if (bal > 0) totDebt += bal;
+            else if (bal < 0) totOverpaid += Math.abs(bal);
+        }
+
+        document.getElementById('kpiCustGlobalPayable').textContent = formatCurrency(totPayable);
+        document.getElementById('kpiCustGlobalPaid').textContent = formatCurrency(totPaid);
+        document.getElementById('kpiCustGlobalDebt').textContent = formatCurrency(totDebt);
+        document.getElementById('kpiCustGlobalOverpaid').textContent = formatCurrency(totOverpaid);
+    };
+
+    const showCustGlobalBreakdown = (type) => {
+        let title = type === 'debt' ? 'Chi Tiết Khách Hàng Đang Nợ' : 'Chi Tiết Khách Hàng Trả Thừa';
+        let color = type === 'debt' ? 'var(--danger-color)' : 'var(--primary-color)';
+        
+        let breakdownHtml = `<table class="table" style="margin-top: 15px;">
+            <thead style="background: #f1f3f5;"><tr><th>Khách Hàng</th><th>Số Điện Thoại</th><th class="text-right">Số Tiền</th></tr></thead>
+            <tbody>`;
+            
+        let hasData = false;
+        let totalAmount = 0;
+
+        for (let phone in globalCustomerBalances) {
+            let cust = globalCustomerBalances[phone];
+            let bal = cust.balance;
+            if (type === 'debt' && bal > 0) {
+                breakdownHtml += `<tr><td><b>${cust.name}</b></td><td>${cust.phone}</td><td class="text-right" style="color:${color}; font-weight:bold;">${formatCurrency(bal)}</td></tr>`;
+                hasData = true;
+                totalAmount += bal;
+            } else if (type === 'overpaid' && bal < 0) {
+                breakdownHtml += `<tr><td><b>${cust.name}</b></td><td>${cust.phone}</td><td class="text-right" style="color:${color}; font-weight:bold;">${formatCurrency(Math.abs(bal))}</td></tr>`;
+                hasData = true;
+                totalAmount += Math.abs(bal);
+            }
+        }
+
+        if (!hasData) {
+            breakdownHtml += `<tr><td colspan="3" class="text-center" style="color:#999; padding: 20px;">Không có dữ liệu</td></tr>`;
+        } else {
+            breakdownHtml += `<tr style="background: #eef7ff;"><td colspan="2" style="font-weight:bold; font-size:16px;">TỔNG CỘNG</td><td class="text-right" style="color:${color}; font-weight:bold; font-size:18px;">${formatCurrency(totalAmount)}</td></tr>`;
+        }
+
+        breakdownHtml += `</tbody></table>`;
+
+        document.getElementById('custDebtBreakdownContent').innerHTML = `
+            <h2 style="margin-top:0; color: ${color}; border-bottom: 2px solid #eee; padding-bottom: 10px;">${title}</h2>
+            ${breakdownHtml}
+        `;
+        
+        document.getElementById('custDebtBreakdownModal').style.display = 'block';
     };
 
     const reRenderCurrentCustomer = () => {
@@ -1025,114 +1137,113 @@
                 <button class="btn btn-warning btn-sm" onclick="startOrderForCustomer('${customer.phone}', '${customer.name}', '${customer.address}')" style="padding: 6px 12px; font-size: 13px;">🛒 Tạo đơn mới</button>
             </div>
 
-            <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: stretch; margin-bottom: 20px;">
-                <!-- CỘT TRÁI: THÔNG TIN KHÁCH HÀNG -->
-                <div class="card" style="border-top: 5px solid var(--primary-color); margin-bottom: 0; display: flex; flex-direction: column;">
-                    <div style="flex: 1;">
-                        <input type="text" id="editCustName" class="crm-input crm-input-name" value="${customer.name}" disabled style="padding-left:0; margin-top:-5px;">
-                        <div class="crm-input-info">📍 <input type="text" id="editCustAddress" class="crm-input" style="width:85%; display:inline-block;" value="${customer.address||''}" disabled></div>
-                        <div class="crm-input-info">📞 <input type="text" id="editCustPhone" class="crm-input" style="width:auto; display:inline-block;" value="${customer.phone}" disabled></div>
+            <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; margin-bottom: 20px;">
+                <!-- CỘT TRÁI: THỐNG KÊ GỌN GÀNG -->
+                <div>
+                    <h4 style="margin:0 0 10px 0; color: var(--danger-color); font-size: 13px; text-transform: uppercase;">💳 Công Nợ Khách Hàng</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                        <div style="background: #fff; padding: 10px; border-radius: 6px; border-left: 4px solid var(--danger-color); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <div style="color:#666; font-size: 11px; text-transform: uppercase;">Phải Thu (Tiền Đơn)</div>
+                            <div style="font-size: 16px; font-weight: bold; color: var(--danger-color);">${formatCurrency(totalOrderAmount)}</div>
+                        </div>
+                        <div style="background: #fff; padding: 10px; border-radius: 6px; border-left: 4px solid var(--success-color); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <div style="color:#666; font-size: 11px; text-transform: uppercase;">Đã Thu</div>
+                            <div style="font-size: 16px; font-weight: bold; color: var(--success-color);">${formatCurrency(totalPaidAmount)}</div>
+                        </div>
+                        <div style="background: #fff; padding: 10px; border-radius: 6px; border-left: 4px solid ${totalDebt > 0 ? 'var(--warning-color)' : (totalDebt < 0 ? 'var(--primary-color)' : '#6c757d')}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <div style="color:#666; font-size: 11px; text-transform: uppercase;">Còn Nợ / Trả Thừa</div>
+                            <div style="font-size: 16px; font-weight: bold; color: ${totalDebt > 0 ? 'var(--warning-color)' : (totalDebt < 0 ? 'var(--primary-color)' : '#6c757d')};">
+                                ${totalDebt > 0 ? 'Nợ: ' + formatCurrency(totalDebt) : (totalDebt < 0 ? 'Thừa: ' + formatCurrency(Math.abs(totalDebt)) : 'Hết nợ')}
+                            </div>
+                        </div>
                     </div>
-                    <div style="margin-top:15px;">
-                        <button id="btnEditCust" class="btn btn-secondary btn-sm" onclick="enableEditCustomer()">✏️ Sửa thông tin</button>
-                        <button id="btnSaveCust" class="btn btn-success btn-sm" style="display:none;" onclick="saveCustomerInfo('${customer.phone}')">💾 Lưu</button>
-                        <button id="btnCancelCust" class="btn btn-danger btn-sm" style="display:none;" onclick="viewCustomerDetail('${customer.phone}')">❌ Hủy</button>
+
+                    <h4 style="margin:0 0 10px 0; color: var(--info-color); font-size: 13px; text-transform: uppercase;">📈 Hiệu Quả Kinh Doanh</h4>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px;">
+                            <span>Tỷ lệ LN: <strong style="color:${marginColor}">${profitMargin}%</strong></span>
+                        </div>
+                        <div class="progress-bar-container" style="height: 6px; margin-top:0;">
+                            <div class="progress-bar" style="width:${marginWidth}%; background-color:${marginColor};"></div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div style="background: #fffaf0; padding: 10px; border-radius: 6px; border: 1px solid #ffc107;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Doanh Thu</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #333;">${formatCurrency(totalSpent)}</div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #6c757d;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Giá Vốn</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #333;">${formatCurrency(totalCogs)}</div>
+                        </div>
+                        <div style="background: #fdf4ff; padding: 10px; border-radius: 6px; border: 1px solid #8e44ad;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Lợi Nhuận</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #8e44ad;">${formatCurrency(totalProfit)}</div>
+                        </div>
+                        <div style="background: #f0fdf4; padding: 10px; border-radius: 6px; border: 1px solid #28a745;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Số Đơn</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #333;">${orders.length}</div>
+                        </div>
+                        <div style="background: #eff6ff; padding: 10px; border-radius: 6px; border: 1px solid #007bff;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Phiếu Thu</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #007bff;">${formatCurrency(totalThu)}</div>
+                        </div>
+                        <div style="background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #dc3545;">
+                            <div style="color:#666; font-size: 10px; text-transform: uppercase;">Chi Phí</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #dc3545;">${formatCurrency(displayTotalChi)}</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- CỘT PHẢI: THỐNG KÊ KPI -->
-                <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <!-- Công Nợ -->
-                    <div>
-                        <h4 style="margin:0 0 8px 0; color: var(--danger-color); font-size: 13px; text-transform: uppercase;">💳 Tình Trạng Công Nợ Khách Hàng</h4>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                            <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid var(--danger-color); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                                <h4 style="margin:0 0 5px 0; color:#666; font-size: 11px; text-transform: uppercase;">TỔNG PHẢI THU (Tiền Đơn)</h4>
-                                <div style="font-size: 18px; font-weight: bold; color: var(--danger-color);">${formatCurrency(totalOrderAmount)}</div>
-                            </div>
-                            <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid var(--success-color); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                                <h4 style="margin:0 0 5px 0; color:#666; font-size: 11px; text-transform: uppercase;">TỔNG ĐÃ THU</h4>
-                                <div style="font-size: 18px; font-weight: bold; color: var(--success-color);">${formatCurrency(totalPaidAmount)}</div>
-                            </div>
-                            <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid ${totalDebt > 0 ? 'var(--warning-color)' : (totalDebt < 0 ? 'var(--primary-color)' : '#6c757d')}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                                <h4 style="margin:0 0 5px 0; color:#666; font-size: 11px; text-transform: uppercase;">CÒN NỢ / TRẢ THỪA</h4>
-                                <div style="font-size: 18px; font-weight: bold; color: ${totalDebt > 0 ? 'var(--warning-color)' : (totalDebt < 0 ? 'var(--primary-color)' : '#6c757d')};">
-                                    ${totalDebt > 0 ? 'Nợ: ' + formatCurrency(totalDebt) : (totalDebt < 0 ? 'Thừa: ' + formatCurrency(Math.abs(totalDebt)) : 'Hết nợ')}
+                <!-- CỘT PHẢI: LỊCH SỬ ĐƠN HÀNG CHIẾM DIỆN TÍCH RỘNG -->
+                <div>
+                    <!-- THÔNG TIN KHÁCH HÀNG (CŨ) ĐƯỢC CHUYỂN SANG ĐÂY -->
+                    <div class="card" style="border-top: 5px solid var(--primary-color); margin-bottom: 20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start">
+                            <div style="flex:1; margin-right:20px;">
+                                <input type="text" id="editCustName" class="crm-input crm-input-name" value="${customer.name}" disabled style="padding-left:0; margin-top:-5px;">
+                                <div class="crm-input-info">📍 <input type="text" id="editCustAddress" class="crm-input" style="width:85%; display:inline-block;" value="${customer.address||''}" disabled></div>
+                                <div class="crm-input-info">📞 <input type="text" id="editCustPhone" class="crm-input" style="width:auto; display:inline-block;" value="${customer.phone}" disabled></div>
+                                <div style="margin-top:10px;">
+                                    <button id="btnEditCust" class="btn btn-secondary btn-sm" onclick="enableEditCustomer()">✏️ Sửa thông tin khách hàng</button>
+                                    <button id="btnSaveCust" class="btn btn-success btn-sm" style="display:none;" onclick="saveCustomerInfo('${customer.phone}')">💾 Lưu</button>
+                                    <button id="btnCancelCust" class="btn btn-danger btn-sm" style="display:none;" onclick="viewCustomerDetail('${customer.phone}')">❌ Hủy</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Hiệu Quả -->
-                    <div>
-                        <h4 style="margin:0 0 5px 0; color: var(--info-color); font-size: 13px; text-transform: uppercase;">📈 Hiệu Quả Kinh Doanh</h4>
-                        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px;">
-                            <span>Tỷ lệ Lợi Nhuận / Doanh Thu: <strong style="color:${marginColor}">${profitMargin}%</strong></span>
-                        </div>
-                        <div class="progress-bar-container" style="height: 6px; margin-top:0; margin-bottom: 10px;">
-                            <div class="progress-bar" style="width:${marginWidth}%; background-color:${marginColor};"></div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
-                            <div style="background: #fffaf0; padding: 10px; border-radius: 6px; border: 1px solid #ffc107; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Doanh Thu</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #333;">${formatCurrency(totalSpent)}</div>
-                            </div>
-                            <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #6c757d; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Giá Vốn</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #333;">${formatCurrency(totalCogs)}</div>
-                            </div>
-                            <div style="background: #fdf4ff; padding: 10px; border-radius: 6px; border: 1px solid #8e44ad; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Lợi Nhuận</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #8e44ad;">${formatCurrency(totalProfit)}</div>
-                            </div>
-                            <div style="background: #f0fdf4; padding: 10px; border-radius: 6px; border: 1px solid #28a745; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Số Đơn</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #333;">${orders.length}</div>
-                            </div>
-                            <div style="background: #eff6ff; padding: 10px; border-radius: 6px; border: 1px solid #007bff; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Phiếu Thu</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #007bff;">${formatCurrency(totalThu)}</div>
-                            </div>
-                            <div style="background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #dc3545; text-align: center;">
-                                <div style="color:#666; font-size: 10px; text-transform: uppercase; margin-bottom: 3px;">Phiếu Chi</div>
-                                <div style="font-size: 13px; font-weight: bold; color: #dc3545;">${formatCurrency(displayTotalChi)}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- BẢNG LỊCH SỬ ĐƠN HÀNG (FULL WIDTH) -->
-            <div>
-                <h4 style="color:var(--primary-color); margin-top:0; margin-bottom:10px;">📜 Lịch sử đơn hàng & Công nợ</h4>
-                <div class="card" style="padding: 0; margin-bottom: 0; max-height: 450px; overflow-y: auto;">
-                    <table class="table" style="margin: 0; font-size: 13px;">
-                        <thead style="background: #f1f3f5; position: sticky; top: 0; z-index: 1;">
-                            <tr><th>Mã ĐH</th><th>Ngày</th><th>Sản phẩm</th><th class="text-right">Tổng Tiền</th><th class="text-right">Đã Trả</th><th class="text-right">Tình Trạng</th><th class="text-center">Thao tác</th></tr>
-                        </thead>
-                        <tbody>
-                            ${orders.length > 0 ? orders.map(o => {
-                                const pPaid = o.payments ? o.payments.reduce((s, p) => s + parseFloat(p.amount||0), 0) : 0;
-                                const pBal = o.totalAmount - pPaid;
-                                let bHtml = '';
-                                if(pBal > 0) bHtml = `<span style="color:var(--danger-color); font-weight:bold;">Nợ: ${formatCurrency(pBal)}</span>`;
-                                else if(pBal < 0) bHtml = `<span style="color:var(--primary-color); font-weight:bold;">Thừa: ${formatCurrency(Math.abs(pBal))}</span>`;
-                                else bHtml = `<span style="color:var(--success-color);">Đã trả đủ</span>`;
-                                
-                                return `<tr>
-                                    <td><a href="javascript:void(0)" onclick="startEditOrder('${o.id}')" style="font-weight:bold; color:blue; text-decoration:underline; font-size:13px;" title="Bấm để mở và sửa PXK">${o.id}</a></td>
-                                    <td>${new Date(o.date).toLocaleDateString('vi-VN')}</td>
-                                    <td>${o.items.map(i=>`• ${i.name.split('{')[0]} <small>(SL:${i.quantity})</small>`).join('<br>')}</td>
-                                    <td class="text-right" style="color:var(--danger-color); font-weight:bold;">${formatCurrency(o.totalAmount)}</td>
-                                    <td class="text-right" style="color:var(--success-color); font-weight:bold;">${formatCurrency(pPaid)}</td>
-                                    <td class="text-right">${bHtml}</td>
-                                    <td class="text-center">
-                                        <button class="btn btn-info btn-sm" onclick="openCustDebtDetail('${o.id}')" style="padding: 4px 10px;">Thanh Toán / Chi Tiết</button>
-                                    </td>
-                                </tr>`;
-                            }).join('') : '<tr><td colspan="7" class="text-center" style="padding: 20px; color:#999;">Chưa có đơn hàng trong thời gian này.</td></tr>'}
-                        </tbody>
-                    </table>
+                    <h4 style="color:var(--primary-color); margin-top:0; margin-bottom:10px;">📜 Lịch sử đơn hàng & Công nợ</h4>
+                    <div class="card" style="padding: 0; margin-bottom: 0; max-height: 400px; overflow-y: auto;">
+                        <table class="table" style="margin: 0; font-size: 12px;">
+                            <thead style="background: #f1f3f5; position: sticky; top: 0; z-index: 1;">
+                                <tr><th>Mã ĐH</th><th>Ngày</th><th>Sản phẩm</th><th class="text-right">Tổng Tiền</th><th class="text-right">Đã Trả</th><th class="text-right">Tình Trạng</th><th class="text-center">Thao tác</th></tr>
+                            </thead>
+                            <tbody>
+                                ${orders.length > 0 ? orders.map(o => {
+                                    const pPaid = o.payments ? o.payments.reduce((s, p) => s + parseFloat(p.amount||0), 0) : 0;
+                                    const pBal = o.totalAmount - pPaid;
+                                    let bHtml = '';
+                                    if(pBal > 0) bHtml = `<span style="color:var(--danger-color); font-weight:bold;">Nợ: ${formatCurrency(pBal)}</span>`;
+                                    else if(pBal < 0) bHtml = `<span style="color:var(--primary-color); font-weight:bold;">Thừa: ${formatCurrency(Math.abs(pBal))}</span>`;
+                                    else bHtml = `<span style="color:var(--success-color);">Đã trả đủ</span>`;
+                                    
+                                    return `<tr>
+                                        <td><a href="javascript:void(0)" onclick="startEditOrder('${o.id}')" style="font-weight:bold; color:blue; text-decoration:underline; font-size:13px;" title="Bấm để mở và sửa PXK">${o.id}</a></td>
+                                        <td>${new Date(o.date).toLocaleDateString('vi-VN')}</td>
+                                        <td>${o.items.map(i=>`• ${i.name.split('{')[0]} <small>(SL:${i.quantity})</small>`).join('<br>')}</td>
+                                        <td class="text-right" style="color:var(--danger-color); font-weight:bold;">${formatCurrency(o.totalAmount)}</td>
+                                        <td class="text-right" style="color:var(--success-color); font-weight:bold;">${formatCurrency(pPaid)}</td>
+                                        <td class="text-right">${bHtml}</td>
+                                        <td class="text-center">
+                                            <button class="btn btn-info btn-sm" onclick="openCustDebtDetail('${o.id}')" style="padding: 4px 10px;">Thanh Toán</button>
+                                        </td>
+                                    </tr>`;
+                                }).join('') : '<tr><td colspan="7" class="text-center" style="padding: 20px; color:#999;">Chưa có đơn hàng trong thời gian này.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
@@ -1219,6 +1330,7 @@
             saveData(KEYS.ORDERS, orders);
             alert('Đã cập nhật lịch sử thanh toán của khách!');
             reRenderCurrentCustomer();
+            renderCustGlobalDashboard();
             openCustDebtDetail(orderId); 
         }
     };
@@ -1231,6 +1343,7 @@
         order.payments = order.payments.filter(p => p.id !== payId);
         saveData(KEYS.ORDERS, orders);
         reRenderCurrentCustomer();
+        renderCustGlobalDashboard();
         openCustDebtDetail(orderId);
     };
 
@@ -1335,6 +1448,7 @@
         else { customers.push({name: order.customer.name, phone: order.customer.phone, address: order.customer.address}); }
         saveData(KEYS.CUSTOMERS, customers);
         saveData(KEYS.STOCK, stockData); saveData(KEYS.ORDERS, orders); cancelEditOrder();
+        renderCustGlobalDashboard();
     };
 
     const updateProductDatalist = (el) => { const stock = loadData(KEYS.STOCK); document.getElementById(el).innerHTML = stock.map(s => `<option value="${s.name} {V:${s.costPrice}}">Tồn: ${s.quantityIn - s.quantityOut} - Vốn: ${formatCurrency(s.costPrice)}</option>`).join(''); }
@@ -1762,7 +1876,7 @@
         saveData(KEYS.SUPPLIERS, sups);
         populateSupplierSelect();
         populateDebtSupplierSelect();
-        alert('Cập nhật thông tin Nhà Cung Cấp thành công!');
+        alert('Cập nhật thông tựn Nhà Cung Cấp thành công!');
         renderSupplierSidebar();
         viewSupplierDetail(newName);
     };
@@ -2178,6 +2292,7 @@
                             item.costPrice = newValue; 
                             changed = true;
                         }
+                        // Tính lại tổng vốn đơn hàng
                         newOrderCost += (item.quantity * item.costPrice);
                     });
                     if(changed) {
@@ -2851,7 +2966,7 @@
         
         const opExp = cashflow.filter(c => c.type === 'CHI' && (!c.orderId || c.orderId.trim() === '')).reduce((sum, c) => sum + (c.amount||0), 0);
         
-        // Tính tổng tất cả phiếu chi (và chi phí nội bộ đơn) cho KPI card TỔNG CHI (Vận hành)
+        // Tính tổng tất cả phiếu chi cho KPI card
         const totalAllExpenses = internalOrderCosts + cashflow.filter(c => c.type === 'CHI').reduce((sum, c) => sum + (c.amount||0), 0);
         
         const otherInc = cashflow.filter(c => c.type === 'THU').reduce((sum, c) => sum + (c.amount||0), 0);
